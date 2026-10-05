@@ -1,5 +1,32 @@
+# Dependencies
 node_modules/
-dist/
+client/node_modules/
+server/node_modules/
+
+# Environment
 .env
-.env.*
-!.env.example
+.env.local
+.env.production
+
+# Build output
+dist/
+client/dist/
+server/dist/
+
+# Prisma
+server/prisma/migrations/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
