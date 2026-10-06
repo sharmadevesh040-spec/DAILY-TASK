@@ -147,13 +147,20 @@ export async function sendOtpEmail(toEmail: string, otp: string, purpose: string
   const transporter = getTransporter();
   const { subject, html, text } = buildOtpEmail(otp, purpose);
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || `"Daily Task Manager" <${process.env.SMTP_USER}>`,
-    to: toEmail,
-    subject,
-    html,
-    text,
-  });
+  const info = await transporter.sendMail({
+  from: process.env.SMTP_FROM || `"Daily Task Manager" <${process.env.SMTP_USER}>`,
+  to: toEmail,
+  subject,
+  html,
+  text,
+});
+
+console.log('[EmailService] OTP email sent:', {
+  messageId: info.messageId,
+  response: info.response,
+  accepted: info.accepted,
+  rejected: info.rejected,
+});
 }
 
 export async function verifySmtpConnection(): Promise<boolean> {
