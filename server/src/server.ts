@@ -18,14 +18,15 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(helmet());
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'https://daily-task-client-pi.vercel.app',
-  // Also honour any extra origin supplied via env var (e.g. custom domain)
-  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
-];
+app.use(
+  cors({
+    origin: [
+      'http://localhost:5173',
+      'https://daily-task-client-pi.vercel.app',
+      'https://localhost',
+    ],
+  })
+);
 
 app.use(
   cors({
