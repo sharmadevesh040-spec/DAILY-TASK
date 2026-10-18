@@ -18,20 +18,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(
-  cors({
-    origin: [
-      'http://localhost:5173',
-      'https://daily-task-client-pi.vercel.app',
-      'https://localhost',
-    ],
-  })
-);
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://daily-task-client-pi.vercel.app',
+  'https://localhost', // Capacitor Android WebView
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow server-to-server / curl calls (no Origin header)
+      // Allow server-to-server / curl / Postman (no Origin header)
       if (!origin) return callback(null, true);
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));

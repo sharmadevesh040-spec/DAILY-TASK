@@ -1,12 +1,14 @@
 import { useState, FormEvent } from 'react';
-import { User, Lock, Loader2, Check } from 'lucide-react';
+import { User, Lock, Loader2, Check, Smartphone, Download, CheckCircle2, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
 import { useToastContext } from '../context/ToastContext';
+import { usePwa } from '../context/PwaContext';
 import { getInitials } from '../utils';
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
+  const { isInstalled, isInstallable, openInstallPrompt } = usePwa();
   const { toast }            = useToastContext();
 
   const [name,           setName]           = useState(user?.name || '');
@@ -174,6 +176,50 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* ── App & Installation card (PWA) ─────────────────────────────────── */}
+      <div className="card p-4 sm:p-6">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+          <Smartphone className="w-5 h-5 text-primary-600 shrink-0" />
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">App Information</h2>
+        </div>
+
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 border border-gray-100 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Daily Task Manager</p>
+              <p className="text-xs text-gray-500">Version 1.0.0 (PWA)</p>
+            </div>
+          </div>
+          <div>
+            {isInstalled ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Installed
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                Web
+              </span>
+            )}
+          </div>
+        </div>
+
+        {!isInstalled && isInstallable && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={openInstallPrompt}
+              className="btn-primary w-full sm:w-auto gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Install Daily Task Manager
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,8 +8,10 @@ import {
   LogOut,
   X,
   Zap,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePwa } from '../context/PwaContext';
 import { getInitials } from '../utils';
 
 const navItems = [
@@ -26,6 +28,7 @@ interface Props {
 
 export default function Sidebar({ onClose }: Props) {
   const { user, logout } = useAuth();
+  const { isInstalled, isInstallable, openInstallPrompt } = usePwa();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -76,6 +79,24 @@ export default function Sidebar({ onClose }: Props) {
           </NavLink>
         ))}
       </nav>
+
+      {/* ── Install App button (PWA) ─────────────────────────────────── */}
+      {!isInstalled && isInstallable && (
+        <div className="px-3 pb-2 shrink-0">
+          <button
+            onClick={() => {
+              openInstallPrompt();
+              onClose();
+            }}
+            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium
+                       bg-primary-50 text-primary-700 hover:bg-primary-100 active:bg-primary-200
+                       transition-colors duration-150 touch-manipulation"
+          >
+            <Download className="w-4 h-4 shrink-0" />
+            <span>Install App</span>
+          </button>
+        </div>
+      )}
 
       {/* ── User profile / sign-out ───────────────────────────────────── */}
       <div className="px-3 py-4 border-t border-gray-100 shrink-0">

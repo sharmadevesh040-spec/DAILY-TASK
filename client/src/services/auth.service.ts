@@ -67,11 +67,17 @@ export const authService = {
   },
 
   /**
-   * Verify OTP for LOGIN/PASSWORD_RESET → returns { token, user }
-   * Verify OTP for REGISTER → returns { verified: true } (account NOT created yet)
+   * Verify OTP for LOGIN → returns { token, user }
+   * Verify OTP for REGISTER / PASSWORD_RESET → returns { verified: true }
    */
   async verifyOtp(payload: VerifyOtpPayload): Promise<AuthResponse | OtpVerifiedResponse> {
     const { data } = await api.post('/auth/verify-otp', payload);
+    return data.data;
+  },
+
+  /** Reset password after OTP verification — returns { token, user } */
+  async resetPassword(payload: { email: string; newPassword: string }): Promise<AuthResponse> {
+    const { data } = await api.post('/auth/reset-password', payload);
     return data.data;
   },
 };

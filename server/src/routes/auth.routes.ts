@@ -8,6 +8,7 @@ import {
   changePassword,
   sendOtp,
   verifyOtpAndAuth,
+  resetPassword,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -67,6 +68,16 @@ router.post(
   ],
   validate,
   verifyOtpAndAuth
+);
+
+router.post(
+  '/reset-password',
+  [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
+  ],
+  validate,
+  resetPassword
 );
 
 // ── Protected ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, Zap, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Zap, Mail, Lock, KeyRound, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
 
@@ -23,6 +23,12 @@ export default function LoginPage() {
   const [otpEmail,     setOtpEmail]     = useState('');
   const [otpLoading,   setOtpLoading]   = useState(false);
   const [otpError,     setOtpError]     = useState('');
+
+  // ── Forgot password fields ────────────────────────────────────────────────
+  const [showForgot,   setShowForgot]   = useState(false);
+  const [forgotEmail,  setForgotEmail]  = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError,  setForgotError]  = useState('');
 
   // ── Password submit ──────────────────────────────────────────────────────
   async function handlePasswordLogin(e: FormEvent) {
@@ -62,6 +68,29 @@ export default function LoginPage() {
       );
     } finally {
       setOtpLoading(false);
+    }
+  }
+
+  // ── Forgot password: send reset OTP ───────────────────────────────────────
+  async function handleForgotPassword(e: FormEvent) {
+    e.preventDefault();
+    setForgotError('');
+    const trimmed = forgotEmail.trim().toLowerCase();
+    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
+      setForgotError('Please enter a valid email address');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await authService.sendOtp({ email: trimmed, purpose: 'PASSWORD_RESET' });
+      navigate('/verify-otp', { state: { email: trimmed, purpose: 'PASSWORD_RESET' } });
+    } catch (err: unknown) {
+      setForgotError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Unable to send reset code. Please try again.'
+      );
+    } finally {
+      setForgotLoading(false);
     }
   }
 
@@ -109,142 +138,241 @@ export default function LoginPage() {
             <span className="text-xl font-bold text-gray-900">TaskFlow</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Welcome back</h1>
-          <p className="text-gray-500 mb-6 text-sm sm:text-base">Sign in to continue</p>
+          {showForgot ? (
+            <div className="animate-fade-in">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgot(false);
+                  setForgotError('');
+                }}
+                className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6 touch-manipulation"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to sign in
+              </button>
 
-          {/* ── Tab switcher ──────────────────────────────────────────── */}
-          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1 mb-6">
-            <button
-              onClick={() => { setTab('password'); setPwError(''); setOtpError(''); }}
-              className={[
-                'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium',
-                'transition-colors duration-150 touch-manipulation',
-                tab === 'password'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <Lock className="w-4 h-4 shrink-0" />
-              Password
-            </button>
-            <button
-              onClick={() => { setTab('otp'); setPwError(''); setOtpError(''); }}
-              className={[
-                'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium',
-                'transition-colors duration-150 touch-manipulation',
-                tab === 'otp'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <Mail className="w-4 h-4 shrink-0" />
-              Email OTP
-            </button>
-          </div>
+              <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center mb-4">
+                <KeyRound className="w-6 h-6 text-primary-600" />
+              </div>
 
-          {/* ── Password form ─────────────────────────────────────────── */}
-          {tab === 'password' && (
-            <>
-              {pwError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words">
-                  {pwError}
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+                Forgot password?
+              </h1>
+              <p className="text-gray-500 mb-6 text-sm sm:text-base leading-relaxed">
+                Enter your registered email address and we'll send you a 6-digit code to reset your password.
+              </p>
+
+              {forgotError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words animate-fade-in">
+                  {forgotError}
                 </div>
               )}
-              <form onSubmit={handlePasswordLogin} className="space-y-4 sm:space-y-5">
+
+              <form onSubmit={handleForgotPassword} className="space-y-4 sm:space-y-5">
                 <div>
-                  <label className="label" htmlFor="login-email">Email address</label>
+                  <label className="label" htmlFor="forgot-email">
+                    Email address
+                  </label>
                   <input
-                    id="login-email"
+                    id="forgot-email"
                     type="email"
                     className="input-field"
                     placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="login-password">Password</label>
-                  <div className="relative">
-                    <input
-                      id="login-password"
-                      type={showPassword ? 'text' : 'password'}
-                      className="input-field pr-11"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center
-                                 text-gray-400 hover:text-gray-600 touch-manipulation"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={pwLoading}
-                  className="btn-primary w-full justify-center py-3 text-base"
-                >
-                  {pwLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Sign in
-                </button>
-              </form>
-            </>
-          )}
-
-          {/* ── OTP form ──────────────────────────────────────────────── */}
-          {tab === 'otp' && (
-            <>
-              {otpError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words">
-                  {otpError}
-                </div>
-              )}
-              <form onSubmit={handleSendOtp} className="space-y-4 sm:space-y-5">
-                <div>
-                  <label className="label" htmlFor="otp-email">Email address</label>
-                  <input
-                    id="otp-email"
-                    type="email"
-                    className="input-field"
-                    placeholder="you@example.com"
-                    value={otpEmail}
-                    onChange={(e) => setOtpEmail(e.target.value)}
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
                     required
                     autoComplete="email"
                     autoFocus
                   />
                 </div>
+
                 <button
                   type="submit"
-                  disabled={otpLoading}
+                  disabled={forgotLoading}
                   className="btn-primary w-full justify-center py-3 text-base"
                 >
-                  {otpLoading
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending code…</>
-                    : <><Mail className="w-4 h-4" /> Send Verification Code</>}
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Sending reset code…
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" /> Send Reset Code
+                    </>
+                  )}
                 </button>
               </form>
-              <p className="mt-3 text-xs text-gray-400 text-center">
-                We'll email you a 6-digit code. No password required.
+
+              <p className="mt-6 text-center text-sm text-gray-500">
+                Remember your password?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgot(false);
+                    setForgotError('');
+                  }}
+                  className="text-primary-600 font-medium hover:underline touch-manipulation"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Welcome back</h1>
+              <p className="text-gray-500 mb-6 text-sm sm:text-base">Sign in to continue</p>
+
+              {/* ── Tab switcher ──────────────────────────────────────────── */}
+              <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1 mb-6">
+                <button
+                  onClick={() => { setTab('password'); setPwError(''); setOtpError(''); }}
+                  className={[
+                    'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium',
+                    'transition-colors duration-150 touch-manipulation',
+                    tab === 'password'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700',
+                  ].join(' ')}
+                >
+                  <Lock className="w-4 h-4 shrink-0" />
+                  Password
+                </button>
+                <button
+                  onClick={() => { setTab('otp'); setPwError(''); setOtpError(''); }}
+                  className={[
+                    'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium',
+                    'transition-colors duration-150 touch-manipulation',
+                    tab === 'otp'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700',
+                  ].join(' ')}
+                >
+                  <Mail className="w-4 h-4 shrink-0" />
+                  Email OTP
+                </button>
+              </div>
+
+              {/* ── Password form ─────────────────────────────────────────── */}
+              {tab === 'password' && (
+                <>
+                  {pwError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words">
+                      {pwError}
+                    </div>
+                  )}
+                  <form onSubmit={handlePasswordLogin} className="space-y-4 sm:space-y-5">
+                    <div>
+                      <label className="label" htmlFor="login-email">Email address</label>
+                      <input
+                        id="login-email"
+                        type="email"
+                        className="input-field"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="login-password">Password</label>
+                      <div className="relative">
+                        <input
+                          id="login-password"
+                          type={showPassword ? 'text' : 'password'}
+                          className="input-field pr-11"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          autoComplete="current-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-0 top-0 h-full w-11 flex items-center justify-center
+                                     text-gray-400 hover:text-gray-600 touch-manipulation"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={pwLoading}
+                      className="btn-primary w-full justify-center py-3 text-base"
+                    >
+                      {pwLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Sign in
+                    </button>
+                  </form>
+
+                  {/* Forgot password link */}
+                  <div className="mt-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgot(true);
+                        setForgotEmail(email); // pre-fill with login email if typed
+                        setForgotError('');
+                      }}
+                      className="text-sm text-primary-600 hover:underline font-medium touch-manipulation"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ── OTP form ──────────────────────────────────────────────── */}
+              {tab === 'otp' && (
+                <>
+                  {otpError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words">
+                      {otpError}
+                    </div>
+                  )}
+                  <form onSubmit={handleSendOtp} className="space-y-4 sm:space-y-5">
+                    <div>
+                      <label className="label" htmlFor="otp-email">Email address</label>
+                      <input
+                        id="otp-email"
+                        type="email"
+                        className="input-field"
+                        placeholder="you@example.com"
+                        value={otpEmail}
+                        onChange={(e) => setOtpEmail(e.target.value)}
+                        required
+                        autoComplete="email"
+                        autoFocus
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={otpLoading}
+                      className="btn-primary w-full justify-center py-3 text-base"
+                    >
+                      {otpLoading
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending code…</>
+                        : <><Mail className="w-4 h-4" /> Send Verification Code</>}
+                    </button>
+                  </form>
+                  <p className="mt-3 text-xs text-gray-400 text-center">
+                    We'll email you a 6-digit code. No password required.
+                  </p>
+                </>
+              )}
+
+              <p className="mt-6 text-center text-sm text-gray-500">
+                Don't have an account?{' '}
+                <Link to="/register" className="text-primary-600 font-medium hover:underline touch-manipulation">
+                  Create one
+                </Link>
               </p>
             </>
           )}
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary-600 font-medium hover:underline touch-manipulation">
-              Create one
-            </Link>
-          </p>
         </div>
       </div>
     </div>

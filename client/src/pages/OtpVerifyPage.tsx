@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, Zap, Mail, ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Loader2, Zap, Mail, ArrowLeft, RefreshCw, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService, OtpPurpose, AuthResponse, OtpVerifiedResponse } from '../services/auth.service';
 import { useToastContext } from '../context/ToastContext';
@@ -47,6 +47,15 @@ export default function OtpVerifyPage() {
   const [error,      setError]      = useState('');
   const [success,    setSuccess]    = useState(false);
 
+  // ── PASSWORD_RESET: after OTP verified, show new-password form ─────────────
+  const [otpVerified,       setOtpVerified]       = useState(false);
+  const [newPassword,       setNewPassword]       = useState('');
+  const [confirmPassword,   setConfirmPassword]   = useState('');
+  const [showNewPw,         setShowNewPw]         = useState(false);
+  const [showConfirmPw,     setShowConfirmPw]     = useState(false);
+  const [resetLoading,      setResetLoading]      = useState(false);
+  const [resetError,        setResetError]        = useState('');
+
   // Countdown: time until OTP expires
   const [timeLeft,   setTimeLeft]   = useState(OTP_TTL_SECONDS);
   // Cooldown: time until Resend is allowed again
@@ -71,8 +80,8 @@ export default function OtpVerifyPage() {
   }
 
   const isExpired = timeLeft <= 0;
-  const canResend = resendWait <= 0 && !success;
-  const canVerify = otp.length === 6 && !isExpired && !verifying && !success;
+  const canResend = resendWait <= 0 && !success && !otpVerified;
+  const canVerify = otp.length === 6 && !isExpired && !verifying && !success && !otpVerified;
 
   // ── Verify ────────────────────────────────────────────────────────────────
   async function handleVerify() {
@@ -83,7 +92,6 @@ export default function OtpVerifyPage() {
     try {
       if (purpose === 'REGISTER') {
         // ── REGISTER flow ─────────────────────────────────────────────────
-        // Step 1: Verify the OTP (returns { verified: true }, does NOT create user)
         const otpResult = await authService.verifyOtp({ email, otp, purpose }) as OtpVerifiedResponse;
 
         if (!otpResult.verified) {
@@ -91,7 +99,6 @@ export default function OtpVerifyPage() {
           return;
         }
 
-        // Step 2: OTP confirmed — now create the account using the full form data
         if (!registerPayload) {
           setError('Registration data missing. Please go back and fill the form again.');
           return;
@@ -99,7 +106,6 @@ export default function OtpVerifyPage() {
 
         const authResult = await authService.register(registerPayload);
 
-        // Step 3: Persist session
         localStorage.setItem('token', authResult.token);
         localStorage.setItem('user', JSON.stringify(authResult.user));
 
@@ -107,9 +113,21 @@ export default function OtpVerifyPage() {
         toast('Account created — welcome! 🎉', 'success');
         setTimeout(() => navigate('/dashboard', { replace: true }), 800);
 
+      } else if (purpose === 'PASSWORD_RESET') {
+        // ── PASSWORD_RESET flow ───────────────────────────────────────────
+        const otpResult = await authService.verifyOtp({ email, otp, purpose }) as OtpVerifiedResponse;
+
+        if (!otpResult.verified) {
+          setError('Verification failed. Please try again.');
+          return;
+        }
+
+        // OTP verified — now show the new password form
+        setOtpVerified(true);
+        toast('Code verified! Set your new password.', 'success');
+
       } else {
-        // ── LOGIN / PASSWORD_RESET flow ───────────────────────────────────
-        // verifyOtp returns { token, user } for non-REGISTER purposes
+        // ── LOGIN flow ───────────────────────────────────────────────────
         const authResult = await authService.verifyOtp({ email, otp, purpose }) as AuthResponse;
 
         localStorage.setItem('token', authResult.token);
@@ -126,6 +144,39 @@ export default function OtpVerifyPage() {
       setError(msg);
     } finally {
       setVerifying(false);
+    }
+  }
+
+  // ── Reset password ────────────────────────────────────────────────────────
+  async function handleResetPassword() {
+    setResetError('');
+
+    if (newPassword.length < 8) {
+      setResetError('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetError('Passwords do not match');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const authResult = await authService.resetPassword({ email, newPassword });
+
+      localStorage.setItem('token', authResult.token);
+      localStorage.setItem('user', JSON.stringify(authResult.user));
+
+      setSuccess(true);
+      toast('Password reset successfully! 🎉', 'success');
+      setTimeout(() => navigate('/dashboard', { replace: true }), 800);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to reset password. Please try again.';
+      setResetError(msg);
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -152,7 +203,7 @@ export default function OtpVerifyPage() {
 
   // Auto-submit when 6 digits are entered
   useEffect(() => {
-    if (otp.length === 6 && !isExpired && !verifying && !success) {
+    if (otp.length === 6 && !isExpired && !verifying && !success && !otpVerified) {
       handleVerify();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,7 +215,10 @@ export default function OtpVerifyPage() {
     : 'sign in to your account';
 
   const backPath = purpose === 'REGISTER' ? '/register' : '/login';
-  const backLabel = purpose === 'REGISTER' ? 'Back to registration' : 'Use a different email';
+  const backLabel =
+    purpose === 'REGISTER'        ? 'Back to registration'
+    : purpose === 'PASSWORD_RESET' ? 'Back to login'
+    : 'Use a different email';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10 overflow-x-hidden">
@@ -185,26 +239,106 @@ export default function OtpVerifyPage() {
             <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               {success
                 ? <ShieldCheck className="w-7 h-7 text-green-500" />
-                : <Mail className="w-7 h-7 text-primary-600" />}
+                : otpVerified
+                  ? <Lock className="w-7 h-7 text-primary-600" />
+                  : <Mail className="w-7 h-7 text-primary-600" />}
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
-              {success ? 'Verified!' : 'Enter Verification Code'}
+              {success
+                ? 'Done!'
+                : otpVerified
+                  ? 'Set New Password'
+                  : 'Enter Verification Code'}
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
               {success
                 ? (purpose === 'REGISTER'
                     ? 'Account created! Redirecting to your dashboard…'
-                    : 'Signed in! Redirecting…')
-                : <>
-                    We sent a 6-digit code to{' '}
-                    <span className="font-semibold text-gray-700 break-all">{email}</span>
-                    {' '}to {purposeLabel}.
-                  </>}
+                    : purpose === 'PASSWORD_RESET'
+                      ? 'Password reset! Redirecting…'
+                      : 'Signed in! Redirecting…')
+                : otpVerified
+                  ? <>Create a new password for <span className="font-semibold text-gray-700 break-all">{email}</span></>
+                  : <>
+                      We sent a 6-digit code to{' '}
+                      <span className="font-semibold text-gray-700 break-all">{email}</span>
+                      {' '}to {purposeLabel}.
+                    </>}
             </p>
           </div>
 
-          {/* OTP input + controls */}
-          {!success && (
+          {/* ── New Password Form (PASSWORD_RESET after OTP verified) ──── */}
+          {otpVerified && !success && (
+            <>
+              {resetError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words animate-fade-in">
+                  {resetError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="label" htmlFor="new-pw">New Password</label>
+                  <div className="relative">
+                    <input
+                      id="new-pw"
+                      type={showNewPw ? 'text' : 'password'}
+                      className="input-field pr-11"
+                      placeholder="At least 8 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPw(!showNewPw)}
+                      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center
+                                 text-gray-400 hover:text-gray-600 touch-manipulation"
+                      aria-label={showNewPw ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label" htmlFor="confirm-pw">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      id="confirm-pw"
+                      type={showConfirmPw ? 'text' : 'password'}
+                      className="input-field pr-11"
+                      placeholder="Repeat new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPw(!showConfirmPw)}
+                      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center
+                                 text-gray-400 hover:text-gray-600 touch-manipulation"
+                      aria-label={showConfirmPw ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleResetPassword}
+                  disabled={resetLoading || !newPassword || !confirmPassword}
+                  className="btn-primary w-full justify-center mt-2"
+                >
+                  {resetLoading
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Resetting…</>
+                    : <><Lock className="w-4 h-4" /> Reset Password</>}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── OTP input + controls ─────────────────────────────────── */}
+          {!success && !otpVerified && (
             <>
               <OtpInput
                 value={otp}
@@ -242,7 +376,9 @@ export default function OtpVerifyPage() {
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</>
                   : purpose === 'REGISTER'
                     ? 'Verify & Create Account'
-                    : 'Verify Code'}
+                    : purpose === 'PASSWORD_RESET'
+                      ? 'Verify Code'
+                      : 'Verify Code'}
               </button>
 
               {/* Resend */}
@@ -276,7 +412,7 @@ export default function OtpVerifyPage() {
           )}
 
           {/* Back link */}
-          {!success && (
+          {!success && !otpVerified && (
             <div className="mt-6 pt-5 border-t border-gray-100 text-center">
               <button
                 onClick={() => navigate(backPath, { replace: true })}

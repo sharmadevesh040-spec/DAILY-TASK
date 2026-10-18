@@ -213,7 +213,15 @@ export async function verifyOtpAndAuth(req: Request, res: Response): Promise<voi
       return;
     }
 
-    // ── LOGIN / PASSWORD_RESET: find existing user and issue JWT ─────────────
+    // ── PASSWORD_RESET purpose: only verify the OTP, do NOT log the user in.
+    //    The frontend will call POST /api/auth/reset-password afterwards with
+    //    the new password.
+    if (purpose === 'PASSWORD_RESET') {
+      successResponse(res, { verified: true }, 'OTP verified. You may now reset your password.');
+      return;
+    }
+
+    // ── LOGIN: find existing user and issue JWT ─────────────────────────────
     const user = await prisma.user.findUnique({ where: { email: rawEmail } });
     if (!user) {
       errorResponse(res, 'No account found for this email.', 404);
@@ -230,3 +238,43 @@ export async function verifyOtpAndAuth(req: Request, res: Response): Promise<voi
     errorResponse(res, msg, 400);
   }
 }
+
+// ── Password reset (after OTP verified) ───────────────────────────────────────
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  try {
+    const rawEmail    = (req.body.email as string || '').toLowerCase().trim();
+    const newPassword = (req.body.newPassword as string || '').trim();
+
+    if (!rawEmail) {
+      errorResponse(res, 'Email is required', 400);
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      errorResponse(res, 'New password must be at least 8 characters', 400);
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: rawEmail } });
+    if (!user) {
+      errorResponse(res, 'No account found for this email.', 404);
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Issue a fresh JWT so the user is logged in right after resetting
+    const token = signToken({ userId: user.id, email: user.email });
+    const { passwordHash: _, ...safeUser } = user;
+
+    successResponse(res, { token, user: safeUser }, 'Password reset successfully');
+  } catch (err) {
+    console.error('ResetPassword error:', err);
+    errorResponse(res, 'Failed to reset password', 500);
+  }
+}
+

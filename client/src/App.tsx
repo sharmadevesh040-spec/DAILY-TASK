@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { PwaProvider } from './context/PwaContext';
+import InstallPromptModal from './components/InstallPromptModal';
 import AppLayout from './layouts/AppLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -103,7 +105,10 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <AppRoutes />
+          <PwaProvider>
+            <AppRoutes />
+            <InstallPromptModal />
+          </PwaProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
