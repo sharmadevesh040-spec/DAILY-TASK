@@ -1,5 +1,13 @@
 import api from './api';
-import { Task, TaskFilters, CreateTaskPayload, UpdateTaskPayload, TaskStatus, Pagination } from '../types';
+import {
+  Task,
+  TaskFilters,
+  CreateTaskPayload,
+  UpdateTaskPayload,
+  TaskStatus,
+  Pagination,
+  TaskProof,
+} from '../types';
 
 export const taskService = {
   async getTasks(filters?: TaskFilters): Promise<{ tasks: Task[]; pagination: Pagination }> {
@@ -42,5 +50,49 @@ export const taskService = {
   async updateStatus(id: string, status: TaskStatus): Promise<Task> {
     const { data } = await api.patch(`/tasks/${id}/status`, { status });
     return data.data.task;
+  },
+
+  /**
+   * FEATURE 1: Submit a photo for AI completion verification
+   */
+  async submitCompletion(
+    taskId: string,
+    photoFile: File,
+    notes?: string,
+    onProgress?: (percent: number) => void
+  ): Promise<{
+    verified: boolean;
+    status: 'VERIFIED' | 'REJECTED';
+    feedback: string;
+    confidence: number;
+    relevanceScore?: number;
+    task: Task;
+    proof: TaskProof;
+  }> {
+    const formData = new FormData();
+    formData.append('photo', photoFile);
+    if (notes) formData.append('notes', notes);
+
+    const { data } = await api.post(`/tasks/${taskId}/submit-completion`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
+      },
+    });
+
+    return data.data;
+  },
+
+  /**
+   * Get past photo verification proof attempts for a task
+   */
+  async getProofs(taskId: string): Promise<TaskProof[]> {
+    const { data } = await api.get(`/tasks/${taskId}/proofs`);
+    return data.data.proofs;
   },
 };

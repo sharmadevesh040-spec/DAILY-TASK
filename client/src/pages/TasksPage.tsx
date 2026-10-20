@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, SlidersHorizontal, Plus, ChevronDown, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, ChevronDown, X, Sparkles } from 'lucide-react';
 import { Task, TaskFilters, Category } from '../types';
 import { taskService } from '../services/task.service';
 import { categoryService } from '../services/category.service';
 import { useToastContext } from '../context/ToastContext';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
+import SmartPlannerModal from '../components/SmartPlannerModal';
 
 const STATUS_FILTERS = [
-  { value: 'ALL',         label: 'All'         },
-  { value: 'TODO',        label: 'To Do'       },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED',   label: 'Completed'   },
-  { value: 'OVERDUE',     label: 'Overdue'     },
+  { value: 'ALL',                  label: 'All'                  },
+  { value: 'TODO',                 label: 'To Do'                },
+  { value: 'IN_PROGRESS',          label: 'In Progress'          },
+  { value: 'PENDING_VERIFICATION', label: 'Pending Verification' },
+  { value: 'COMPLETED',            label: 'Completed'            },
+  { value: 'OVERDUE',              label: 'Overdue'              },
 ];
 
 const PRIORITY_FILTERS = [
@@ -35,11 +37,12 @@ export default function TasksPage() {
   const { toast } = useToastContext();
 
   const [tasks,          setTasks]          = useState<Task[]>([]);
-  const [categories,     setCategories]     = useState<Category[]>([]);
-  const [loading,        setLoading]        = useState(true);
-  const [showModal,      setShowModal]      = useState(false);
-  const [showFilters,    setShowFilters]    = useState(false);
-  const [total,          setTotal]          = useState(0);
+  const [categories,       setCategories]       = useState<Category[]>([]);
+  const [loading,          setLoading]          = useState(true);
+  const [showModal,        setShowModal]        = useState(false);
+  const [showPlannerModal, setShowPlannerModal] = useState(false);
+  const [showFilters,      setShowFilters]      = useState(false);
+  const [total,            setTotal]            = useState(0);
 
   const [search,         setSearch]         = useState('');
   const [statusFilter,   setStatusFilter]   = useState('ALL');
@@ -158,7 +161,16 @@ export default function TasksPage() {
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
 
-          <button onClick={() => setShowModal(true)} className="btn-primary shrink-0">
+          <button
+            onClick={() => setShowPlannerModal(true)}
+            className="btn-secondary text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 shrink-0 gap-1.5"
+            title="Open AI Smart Planner"
+          >
+            <Sparkles className="w-4 h-4 text-primary-600" />
+            <span className="hidden sm:inline">AI Planner</span>
+          </button>
+
+          <button onClick={() => setShowModal(true)} className="btn-primary shrink-0 gap-1.5">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
           </button>
@@ -261,6 +273,16 @@ export default function TasksPage() {
         <TaskModal
           onClose={() => setShowModal(false)}
           onSuccess={(t) => { setShowModal(false); setTasks((p) => [t, ...p]); setTotal((p) => p + 1); }}
+        />
+      )}
+
+      {showPlannerModal && (
+        <SmartPlannerModal
+          onClose={() => setShowPlannerModal(false)}
+          onSuccess={() => {
+            setShowPlannerModal(false);
+            load();
+          }}
         />
       )}
     </div>

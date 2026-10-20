@@ -9,6 +9,7 @@ import {
   X,
   Zap,
   Download,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePwa } from '../context/PwaContext';
@@ -17,6 +18,7 @@ import { getInitials } from '../utils';
 const navItems = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/tasks',      icon: CheckSquare,     label: 'My Tasks'  },
+  { to: '/planner',    icon: Sparkles,        label: 'AI Planner'},
   { to: '/calendar',   icon: Calendar,        label: 'Calendar'  },
   { to: '/categories', icon: Tag,             label: 'Categories'},
   { to: '/settings',   icon: Settings,        label: 'Settings'  },

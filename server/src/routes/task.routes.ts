@@ -9,6 +9,11 @@ import {
   updateTaskStatus,
   getTodayTasks,
 } from '../controllers/task.controller';
+import {
+  submitTaskCompletionPhoto,
+  getTaskProofs,
+  uploadMiddleware,
+} from '../controllers/taskProof.controller';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 
@@ -40,11 +45,21 @@ router.patch(
   '/:id/status',
   [
     body('status')
-      .isIn(['TODO', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE'])
+      .isIn(['TODO', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE', 'PENDING_VERIFICATION'])
       .withMessage('Invalid status'),
   ],
   validate,
   updateTaskStatus
 );
+
+// FEATURE 1: Submit completion photo for verification
+router.post(
+  '/:id/submit-completion',
+  uploadMiddleware.single('photo'),
+  submitTaskCompletionPhoto
+);
+
+// Get task proof history
+router.get('/:id/proofs', getTaskProofs);
 
 export default router;

@@ -23,17 +23,22 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
 
     // Today's tasks
     const [todayTotal, todayCompleted, todayPending, overdue, upcoming] = await Promise.all([
-      prisma.task.count({ where: { userId: req.userId, dueDate: { gte: todayStart, lte: todayEnd } } }),
-      prisma.task.count({ where: { userId: req.userId, status: 'COMPLETED', dueDate: { gte: todayStart, lte: todayEnd } } }),
-      prisma.task.count({ where: { userId: req.userId, status: { in: ['TODO', 'IN_PROGRESS'] }, dueDate: { gte: todayStart, lte: todayEnd } } }),
-      prisma.task.count({ where: { userId: req.userId, status: 'OVERDUE' } }),
+      prisma.task.count({ where: { userId: req.userId, dueDate: { gte: todayStart, lte: todayEnd }, parentTaskId: null } }),
+      prisma.task.count({ where: { userId: req.userId, status: 'COMPLETED', dueDate: { gte: todayStart, lte: todayEnd }, parentTaskId: null } }),
+      prisma.task.count({ where: { userId: req.userId, status: { in: ['TODO', 'IN_PROGRESS', 'PENDING_VERIFICATION'] }, dueDate: { gte: todayStart, lte: todayEnd }, parentTaskId: null } }),
+      prisma.task.count({ where: { userId: req.userId, status: 'OVERDUE', parentTaskId: null } }),
       prisma.task.findMany({
         where: {
           userId: req.userId,
           dueDate: { gt: todayEnd, lte: endOfDay(addDays(today, 7)) },
           status: { not: 'COMPLETED' },
+          parentTaskId: null,
         },
-        include: { category: true },
+        include: {
+          category: true,
+          taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+          subtasks: true,
+        },
         orderBy: { dueDate: 'asc' },
         take: 5,
       }),
@@ -41,15 +46,24 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
 
     // Today's tasks list
     const todayTasks = await prisma.task.findMany({
-      where: { userId: req.userId, dueDate: { gte: todayStart, lte: todayEnd } },
-      include: { category: true, reminders: true },
+      where: { userId: req.userId, dueDate: { gte: todayStart, lte: todayEnd }, parentTaskId: null },
+      include: {
+        category: true,
+        reminders: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+        subtasks: true,
+      },
       orderBy: [{ status: 'asc' }, { priority: 'asc' }],
     });
 
     // Overdue tasks list
     const overdueTasks = await prisma.task.findMany({
-      where: { userId: req.userId, status: 'OVERDUE' },
-      include: { category: true },
+      where: { userId: req.userId, status: 'OVERDUE', parentTaskId: null },
+      include: {
+        category: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+        subtasks: true,
+      },
       orderBy: { dueDate: 'asc' },
       take: 10,
     });

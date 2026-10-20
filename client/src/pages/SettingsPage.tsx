@@ -1,7 +1,8 @@
-import { useState, FormEvent } from 'react';
-import { User, Lock, Loader2, Check, Smartphone, Download, CheckCircle2, Sparkles } from 'lucide-react';
+import { useState, useEffect, FormEvent } from 'react';
+import { User, Lock, Loader2, Check, Smartphone, Download, CheckCircle2, Sparkles, Bell, BellRing } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
+import { notificationService } from '../services/notification.service';
 import { useToastContext } from '../context/ToastContext';
 import { usePwa } from '../context/PwaContext';
 import { getInitials } from '../utils';
@@ -19,6 +20,35 @@ export default function SettingsPage() {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [pwLoading,          setPwLoading]          = useState(false);
   const [pwError,            setPwError]            = useState('');
+
+  // Notification settings
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => {
+    setPushSupported(notificationService.isPushSupported());
+    setPushPermission(notificationService.getPermissionState());
+  }, []);
+
+  async function handleTogglePush() {
+    setPushLoading(true);
+    try {
+      if (pushPermission === 'granted') {
+        await notificationService.unsubscribePush();
+        setPushPermission('default');
+        toast('Push notifications disabled', 'info');
+      } else {
+        const result = await notificationService.subscribePush();
+        setPushPermission(notificationService.getPermissionState());
+        toast(result.message, result.success ? 'success' : 'error');
+      }
+    } catch (err: any) {
+      toast(err?.message || 'Error configuring push notifications', 'error');
+    } finally {
+      setPushLoading(false);
+    }
+  }
 
   async function handleProfileSave(e: FormEvent) {
     e.preventDefault();
@@ -176,6 +206,67 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* ── Notifications & Push Alerts Card ──────────────────────────────── */}
+      <div className="card p-4 sm:p-6">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+          <Bell className="w-5 h-5 text-primary-600 shrink-0" />
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Notifications</h2>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
+            Configure how you receive deadline reminders, overdue task alerts, and AI photo completion verification results.
+          </p>
+
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600 shrink-0">
+                <BellRing className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Browser Push Notifications</p>
+                <p className="text-xs text-gray-500">
+                  {pushSupported
+                    ? pushPermission === 'granted'
+                      ? 'Push notifications are active on this device'
+                      : pushPermission === 'denied'
+                        ? 'Notifications blocked in browser settings'
+                        : 'Receive real-time push alerts when tasks are due or verified'
+                    : 'Not supported in this browser'}
+                </p>
+              </div>
+            </div>
+
+            {pushSupported && (
+              <div>
+                {pushPermission === 'denied' ? (
+                  <span className="text-xs text-red-500 font-medium px-2 py-1 bg-red-50 rounded-md">
+                    Blocked
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleTogglePush}
+                    disabled={pushLoading}
+                    className={`btn text-xs py-1.5 px-3.5 ${
+                      pushPermission === 'granted'
+                        ? 'btn-secondary text-gray-600'
+                        : 'btn-primary'
+                    }`}
+                  >
+                    {pushLoading
+                      ? 'Updating...'
+                      : pushPermission === 'granted'
+                        ? 'Disable'
+                        : 'Enable Push'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── App & Installation card (PWA) ─────────────────────────────────── */}

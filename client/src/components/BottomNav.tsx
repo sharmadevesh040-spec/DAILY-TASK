@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, CheckSquare, Calendar, Tag, Settings } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Calendar, Tag, Settings, Sparkles } from 'lucide-react';
 
 const navItems = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Home'     },
   { to: '/tasks',      icon: CheckSquare,     label: 'Tasks'    },
+  { to: '/planner',    icon: Sparkles,        label: 'Planner'  },
   { to: '/calendar',   icon: Calendar,        label: 'Calendar' },
   { to: '/categories', icon: Tag,             label: 'Tags'     },
   { to: '/settings',   icon: Settings,        label: 'Settings' },

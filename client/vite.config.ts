@@ -55,6 +55,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         navigateFallback: '/index.html',
+        importScripts: ['/sw-push.js'],
         // Never route API calls to SPA index fallback
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [

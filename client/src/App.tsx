@@ -12,6 +12,7 @@ import TasksPage from './pages/TasksPage';
 import CalendarPage from './pages/CalendarPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SettingsPage from './pages/SettingsPage';
+import PlannerPage from './pages/PlannerPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -89,6 +90,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="planner" element={<PlannerPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="settings" element={<SettingsPage />} />

@@ -8,6 +8,8 @@ import {
   Plus,
   ArrowRight,
   BarChart2,
+  Sparkles,
+  CalendarClock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +18,7 @@ import { DashboardData, Task } from '../types';
 import { getGreeting, formatDateShort } from '../utils';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
+import SmartPlannerModal from '../components/SmartPlannerModal';
 import { useToastContext } from '../context/ToastContext';
 
 export default function DashboardPage() {
@@ -23,10 +26,12 @@ export default function DashboardPage() {
   const navigate    = useNavigate();
   const { toast }   = useToastContext();
 
-  const [data,          setData]          = useState<DashboardData | null>(null);
-  const [streak,        setStreak]        = useState(0);
-  const [loading,       setLoading]       = useState(true);
-  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [data,             setData]             = useState<DashboardData | null>(null);
+  const [streak,           setStreak]           = useState(0);
+  const [loading,          setLoading]          = useState(true);
+  const [showTaskModal,    setShowTaskModal]    = useState(false);
+  const [showPlannerModal, setShowPlannerModal] = useState(false);
+  const [plannerTab,       setPlannerTab]       = useState<'plan' | 'reschedule'>('plan');
 
   const load = useCallback(async () => {
     try {
@@ -97,15 +102,49 @@ export default function DashboardPage() {
           {/* Shorter date on mobile to avoid wrapping */}
           <p className="text-gray-500 mt-0.5 text-xs sm:text-sm truncate">{dateStr}</p>
         </div>
-        {/* New Task only on md+ — mobile uses FAB-style header button */}
-        <button
-          onClick={() => setShowTaskModal(true)}
-          className="btn-primary shrink-0 hidden sm:inline-flex"
-        >
-          <Plus className="w-4 h-4" />
-          New Task
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setPlannerTab('plan');
+              setShowPlannerModal(true);
+            }}
+            className="btn-secondary text-primary-700 bg-primary-50 border border-primary-200 shrink-0 hidden sm:inline-flex gap-1.5 text-xs sm:text-sm"
+          >
+            <Sparkles className="w-4 h-4 text-primary-600" />
+            <span>AI Planner</span>
+          </button>
+          <button
+            onClick={() => setShowTaskModal(true)}
+            className="btn-primary shrink-0 hidden sm:inline-flex text-xs sm:text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Task</span>
+          </button>
+        </div>
       </div>
+
+      {/* Overdue alert banner with AI Reschedule prompt */}
+      {(stats?.overdue ?? 0) > 0 && (
+        <div className="p-3.5 bg-gradient-to-r from-red-50 to-amber-50 border border-red-200/80 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <p className="text-xs sm:text-sm text-red-900 font-medium truncate">
+              You have <span className="font-bold">{stats?.overdue} overdue task{stats?.overdue === 1 ? '' : 's'}</span>. Need help catching up?
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setPlannerTab('reschedule');
+              setShowPlannerModal(true);
+            }}
+            className="btn-primary text-xs py-1.5 px-3 bg-red-600 hover:bg-red-700 shrink-0 gap-1.5"
+          >
+            <CalendarClock className="w-3.5 h-3.5" />
+            <span>AI Reschedule</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Stat cards — always 2 cols, 4 cols on lg ──────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -277,6 +316,17 @@ export default function DashboardPage() {
         <TaskModal
           onClose={() => setShowTaskModal(false)}
           onSuccess={() => { setShowTaskModal(false); load(); }}
+        />
+      )}
+
+      {showPlannerModal && (
+        <SmartPlannerModal
+          defaultTab={plannerTab}
+          onClose={() => setShowPlannerModal(false)}
+          onSuccess={() => {
+            setShowPlannerModal(false);
+            load();
+          }}
         />
       )}
     </div>

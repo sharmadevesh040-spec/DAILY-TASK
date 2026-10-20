@@ -4,12 +4,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 
 import authRoutes from './routes/auth.routes';
 import taskRoutes from './routes/task.routes';
 import categoryRoutes from './routes/category.routes';
 import reminderRoutes from './routes/reminder.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import plannerRoutes from './routes/planner.routes';
+import notificationRoutes from './routes/notification.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { startReminderCron } from './services/reminderCron';
 import { validateSmtpConfig } from './services/emailService';
@@ -27,6 +30,12 @@ const ALLOWED_ORIGINS = [
 ];
 
 app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+app.use(
   cors({
     origin: (origin, callback) => {
       // Allow server-to-server / curl / Postman (no Origin header)
@@ -39,6 +48,9 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// Serve local upload fallbacks statically
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -76,6 +88,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/planner', plannerRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -91,10 +105,13 @@ startReminderCron();
 // Validate SMTP configuration on startup
 validateSmtpConfig();
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}\n`);
-});
+let runningServer: any = null;
+if (process.env.NODE_ENV !== 'test') {
+  runningServer = app.listen(PORT, () => {
+    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}\n`);
+  });
+}
 
 export default app;

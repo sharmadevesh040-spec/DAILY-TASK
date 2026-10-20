@@ -68,6 +68,7 @@ export function getStatusColor(status: TaskStatus): string {
   const map: Record<TaskStatus, string> = {
     TODO: 'bg-gray-100 text-gray-600',
     IN_PROGRESS: 'bg-blue-100 text-blue-700',
+    PENDING_VERIFICATION: 'bg-amber-100 text-amber-700',
     COMPLETED: 'bg-green-100 text-green-700',
     OVERDUE: 'bg-red-100 text-red-700',
   };
@@ -78,6 +79,7 @@ export function getStatusLabel(status: TaskStatus): string {
   const map: Record<TaskStatus, string> = {
     TODO: 'To Do',
     IN_PROGRESS: 'In Progress',
+    PENDING_VERIFICATION: 'Pending Verification',
     COMPLETED: 'Completed',
     OVERDUE: 'Overdue',
   };

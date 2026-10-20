@@ -1,6 +1,7 @@
-export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'PENDING_VERIFICATION';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type RecurrenceType = 'DAILY' | 'WEEKDAYS' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export interface User {
   id: string;
@@ -46,6 +47,21 @@ export interface TaskHistory {
   createdAt: string;
 }
 
+export interface TaskProof {
+  id: string;
+  taskId: string;
+  userId: string;
+  imageUrl: string;
+  imageKey?: string;
+  notes?: string;
+  status: VerificationStatus;
+  aiScore?: number;
+  aiFeedback?: string;
+  aiDetails?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+}
+
 export interface Task {
   id: string;
   userId: string;
@@ -57,12 +73,20 @@ export interface Task {
   dueTime?: string;
   categoryId?: string;
   completedAt?: string;
+  verificationStatus?: VerificationStatus;
+  proofPhotoUrl?: string;
+  proofPhotoKey?: string;
+  verificationFeedback?: string;
+  estimatedDuration?: number;
+  parentTaskId?: string;
   createdAt: string;
   updatedAt: string;
   category?: Category;
   reminders?: Reminder[];
   recurringTask?: RecurringTask;
   taskHistory?: TaskHistory[];
+  taskProofs?: TaskProof[];
+  subtasks?: Task[];
 }
 
 export interface DashboardStats {
@@ -117,6 +141,8 @@ export interface CreateTaskPayload {
   categoryId?: string;
   dueDate?: string;
   dueTime?: string;
+  estimatedDuration?: number;
+  parentTaskId?: string;
   recurrence?: {
     type: RecurrenceType;
     interval?: number;
@@ -127,4 +153,64 @@ export interface CreateTaskPayload {
 
 export interface UpdateTaskPayload extends Partial<CreateTaskPayload> {
   status?: TaskStatus;
+}
+
+// ── Notification Types ───────────────────────────────────────────────────────
+export type NotificationType =
+  | 'VERIFICATION_SUCCESS'
+  | 'VERIFICATION_REJECTED'
+  | 'TASK_DEADLINE'
+  | 'TASK_OVERDUE'
+  | 'PLANNER_REMINDER'
+  | 'SYSTEM';
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  taskId?: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  isRead: boolean;
+  metadata?: string;
+  createdAt: string;
+}
+
+// ── AI Smart Planner Types ───────────────────────────────────────────────────
+export interface GeneratedSubtask {
+  title: string;
+  description?: string;
+  priority?: Priority;
+  estimatedDuration?: number;
+}
+
+export interface GeneratedTask {
+  title: string;
+  description?: string;
+  priority: Priority;
+  dueDate?: string;
+  dueTime?: string;
+  estimatedDuration?: number;
+  categoryName?: string;
+  subtasks?: GeneratedSubtask[];
+}
+
+export interface GeneratedPlan {
+  summary: string;
+  suggestedSchedule: string;
+  tasks: GeneratedTask[];
+}
+
+export interface RescheduleSuggestion {
+  taskId: string;
+  taskTitle: string;
+  currentDueDate?: string | null;
+  suggestedDueDate: string;
+  suggestedDueTime?: string | null;
+  reason: string;
+}
+
+export interface ReschedulePlan {
+  summary: string;
+  suggestions: RescheduleSuggestion[];
 }

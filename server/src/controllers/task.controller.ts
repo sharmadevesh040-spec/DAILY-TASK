@@ -26,7 +26,10 @@ export async function getTasks(req: AuthenticatedRequest, res: Response): Promis
       limit = '50',
     } = req.query as Record<string, string>;
 
-    const where: Record<string, unknown> = { userId: req.userId };
+    const where: Record<string, unknown> = {
+      userId: req.userId,
+      parentTaskId: null, // Return top-level tasks by default; subtasks are nested
+    };
 
     if (status) where['status'] = status as TaskStatus;
     if (priority) where['priority'] = priority as Priority;
@@ -74,6 +77,8 @@ export async function getTasks(req: AuthenticatedRequest, res: Response): Promis
           category: true,
           reminders: true,
           recurringTask: true,
+          taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+          subtasks: { orderBy: { createdAt: 'asc' } },
         },
         orderBy,
         skip,
@@ -82,7 +87,7 @@ export async function getTasks(req: AuthenticatedRequest, res: Response): Promis
       prisma.task.count({ where }),
     ]);
 
-    // Client-side priority sort if needed (Prisma enum ordering isn't guaranteed alphabetical)
+    // Client-side priority sort if needed
     let sortedTasks = tasks;
     if (sortBy === 'priority') {
       sortedTasks = tasks.sort((a, b) => {
@@ -106,7 +111,14 @@ export async function getTask(req: AuthenticatedRequest, res: Response): Promise
   try {
     const task = await prisma.task.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      include: { category: true, reminders: true, recurringTask: true, taskHistory: { orderBy: { createdAt: 'desc' }, take: 20 } },
+      include: {
+        category: true,
+        reminders: true,
+        recurringTask: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' } },
+        subtasks: { orderBy: { createdAt: 'asc' } },
+        taskHistory: { orderBy: { createdAt: 'desc' }, take: 20 },
+      },
     });
 
     if (!task) {
@@ -124,7 +136,18 @@ export async function getTask(req: AuthenticatedRequest, res: Response): Promise
 // POST /tasks
 export async function createTask(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { title, description, priority, categoryId, dueDate, dueTime, recurrence, reminderMinutes } = req.body;
+    const {
+      title,
+      description,
+      priority,
+      categoryId,
+      dueDate,
+      dueTime,
+      recurrence,
+      reminderMinutes,
+      estimatedDuration,
+      parentTaskId,
+    } = req.body;
 
     const task = await prisma.task.create({
       data: {
@@ -135,8 +158,10 @@ export async function createTask(req: AuthenticatedRequest, res: Response): Prom
         categoryId: categoryId || null,
         dueDate: dueDate ? new Date(dueDate) : null,
         dueTime: dueTime || null,
+        estimatedDuration: estimatedDuration ? Number(estimatedDuration) : null,
+        parentTaskId: parentTaskId || null,
       },
-      include: { category: true, reminders: true, recurringTask: true },
+      include: { category: true, reminders: true, recurringTask: true, subtasks: true },
     });
 
     // Create recurring task config
@@ -169,7 +194,13 @@ export async function createTask(req: AuthenticatedRequest, res: Response): Prom
 
     const fullTask = await prisma.task.findUnique({
       where: { id: task.id },
-      include: { category: true, reminders: true, recurringTask: true },
+      include: {
+        category: true,
+        reminders: true,
+        recurringTask: true,
+        subtasks: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+      },
     });
 
     successResponse(res, { task: fullTask }, 'Task created successfully', 201);
@@ -188,7 +219,18 @@ export async function updateTask(req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
-    const { title, description, priority, categoryId, dueDate, dueTime, status, recurrence, reminderMinutes } = req.body;
+    const {
+      title,
+      description,
+      priority,
+      categoryId,
+      dueDate,
+      dueTime,
+      status,
+      recurrence,
+      reminderMinutes,
+      estimatedDuration,
+    } = req.body;
 
     const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData['title'] = title;
@@ -197,7 +239,17 @@ export async function updateTask(req: AuthenticatedRequest, res: Response): Prom
     if (categoryId !== undefined) updateData['categoryId'] = categoryId || null;
     if (dueDate !== undefined) updateData['dueDate'] = dueDate ? new Date(dueDate) : null;
     if (dueTime !== undefined) updateData['dueTime'] = dueTime || null;
+    if (estimatedDuration !== undefined) updateData['estimatedDuration'] = estimatedDuration ? Number(estimatedDuration) : null;
     if (status !== undefined) {
+      // If marking as COMPLETED via PUT, enforce photo verification
+      if (status === 'COMPLETED' && existing.verificationStatus !== 'VERIFIED') {
+        errorResponse(
+          res,
+          'Photo verification is required to complete this task. Please submit a completion photo for verification.',
+          400
+        );
+        return;
+      }
       updateData['status'] = status as TaskStatus;
       if (status === 'COMPLETED') updateData['completedAt'] = new Date();
       else updateData['completedAt'] = null;
@@ -206,7 +258,13 @@ export async function updateTask(req: AuthenticatedRequest, res: Response): Prom
     const task = await prisma.task.update({
       where: { id: req.params.id },
       data: updateData,
-      include: { category: true, reminders: true, recurringTask: true },
+      include: {
+        category: true,
+        reminders: true,
+        recurringTask: true,
+        subtasks: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+      },
     });
 
     // Update recurrence
@@ -286,22 +344,45 @@ export async function updateTaskStatus(req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    // FEATURE 1: Photo-required completion check
+    if (status === 'COMPLETED' && existing.verificationStatus !== 'VERIFIED') {
+      errorResponse(
+        res,
+        'Photo verification is required to complete this task. Please submit a completion photo for verification.',
+        400
+      );
+      return;
+    }
+
     const updateData: Record<string, unknown> = {
       status: status as TaskStatus,
       completedAt: status === 'COMPLETED' ? new Date() : null,
     };
 
+    if (status === 'PENDING_VERIFICATION') {
+      updateData['verificationStatus'] = 'PENDING';
+    } else if (status === 'TODO' || status === 'IN_PROGRESS') {
+      // If moving back to in-progress/todo, keep previous proof history but allow new submission
+      if (existing.status === 'COMPLETED') {
+        updateData['completedAt'] = null;
+      }
+    }
+
     const task = await prisma.task.update({
       where: { id: req.params.id },
       data: updateData,
-      include: { category: true, reminders: true, recurringTask: true },
+      include: {
+        category: true,
+        reminders: true,
+        recurringTask: true,
+        subtasks: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+      },
     });
 
-    // Handle recurring task: create next occurrence on completion
+    // Handle recurring task next occurrence on completion
     if (status === 'COMPLETED' && task.recurringTask && task.dueDate) {
       const rt = task.recurringTask;
-
-      // Check end date
       const shouldContinue = !rt.endDate || new Date() < rt.endDate;
 
       if (shouldContinue) {
@@ -327,9 +408,7 @@ export async function updateTaskStatus(req: AuthenticatedRequest, res: Response)
             break;
         }
 
-        // Avoid creating if past endDate
         if (!rt.endDate || nextDue <= rt.endDate) {
-          // Check for existing duplicate
           const duplicate = await prisma.task.findFirst({
             where: {
               userId: req.userId!,
@@ -389,8 +468,14 @@ export async function getTodayTasks(req: AuthenticatedRequest, res: Response): P
       where: {
         userId: req.userId,
         dueDate: { gte: today, lt: tomorrow },
+        parentTaskId: null,
       },
-      include: { category: true, reminders: true },
+      include: {
+        category: true,
+        reminders: true,
+        subtasks: true,
+        taskProofs: { orderBy: { submittedAt: 'desc' }, take: 1 },
+      },
       orderBy: [{ status: 'asc' }, { priority: 'asc' }],
     });
 
