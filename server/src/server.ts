@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import fs from 'fs';
 
 import authRoutes from './routes/auth.routes';
 import taskRoutes from './routes/task.routes';
@@ -49,8 +50,14 @@ app.use(
   })
 );
 
-// Serve local upload fallbacks statically
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// Serve local upload fallbacks statically (if folder exists)
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
+app.use('/uploads', (req, res, next) => {
+  if (fs.existsSync(uploadsDir)) {
+    return express.static(uploadsDir)(req, res, next);
+  }
+  next();
+});
 
 // Rate limiting
 const limiter = rateLimit({
@@ -99,8 +106,10 @@ app.use((_req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start cron jobs
-startReminderCron();
+// Start cron jobs (in standalone server mode)
+if (process.env.NODE_ENV !== 'test') {
+  startReminderCron();
+}
 
 // Validate SMTP configuration on startup
 validateSmtpConfig();
@@ -115,3 +124,8 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
+// Export for CommonJS compatibility in serverless runtimes
+// @ts-ignore
+module.exports = app;
+// @ts-ignore
+module.exports.default = app;

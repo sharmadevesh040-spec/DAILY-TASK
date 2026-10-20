@@ -3,31 +3,32 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Initialize Cloudinary if credentials are provided
-const hasCloudinary = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
+// Check if Cloudinary credentials are provided
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+}
 
-if (hasCloudinary) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-  console.log('[Storage] Cloudinary initialized for production object storage');
+if (isCloudinaryConfigured()) {
+  try {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    });
+    console.log('[Storage] Cloudinary initialized for persistent object storage');
+  } catch (err) {
+    console.error('[Storage] Error configuring Cloudinary:', err);
+  }
 } else {
-  console.log('[Storage] Cloudinary credentials not configured. Using local uploads directory fallback.');
+  console.log('[Storage] Cloudinary credentials not configured. In production/serverless, Cloudinary is required for photo proofs.');
 }
 
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
-
-// Ensure local uploads directory exists for fallback
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
 
 export interface UploadResult {
   url: string;
@@ -55,7 +56,7 @@ export async function uploadImageBuffer(
     throw new Error('Image size exceeds 10MB limit');
   }
 
-  if (hasCloudinary) {
+  if (isCloudinaryConfigured()) {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -77,7 +78,29 @@ export async function uploadImageBuffer(
     });
   }
 
-  // Fallback: Local storage
+  // Fallback: Local storage (Only in non-serverless / local development environments)
+  const isServerlessOrProd = Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.NODE_ENV === 'production'
+  );
+
+  if (isServerlessOrProd) {
+    throw new Error(
+      'Persistent photo storage is not configured. Cloudinary credentials (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) must be set in Vercel environment variables for task completion photo proofs.'
+    );
+  }
+
+  // Lazily ensure local directory exists only when an actual file is uploaded in local dev
+  try {
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+  } catch (dirErr: any) {
+    console.error('[Storage] Failed to create local uploads directory:', dirErr);
+    throw new Error('Local uploads directory cannot be created on this filesystem.');
+  }
+
   const ext = path.extname(originalname) || '.jpg';
   const fileKey = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
   const filePath = path.join(UPLOADS_DIR, fileKey);
@@ -98,14 +121,16 @@ export async function uploadImageBuffer(
  */
 export async function deleteImage(key: string): Promise<void> {
   try {
-    if (hasCloudinary && !key.includes('/')) {
+    if (isCloudinaryConfigured() && !key.includes('/uploads/')) {
       await cloudinary.uploader.destroy(key);
       return;
     }
 
-    const filePath = path.join(UPLOADS_DIR, path.basename(key));
-    if (fs.existsSync(filePath)) {
-      await fs.promises.unlink(filePath);
+    if (fs.existsSync(UPLOADS_DIR)) {
+      const filePath = path.join(UPLOADS_DIR, path.basename(key));
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+      }
     }
   } catch (err) {
     console.error('[Storage] Error deleting image:', err);
