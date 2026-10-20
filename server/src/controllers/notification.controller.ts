@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../types';
 import {
   getVapidPublicKey,
   syncDeadlineAndOverdueNotifications,
+  broadcastNotification,
 } from '../services/notificationService';
 
 // GET /api/notifications
@@ -184,5 +185,34 @@ export async function unsubscribePush(req: AuthenticatedRequest, res: Response):
   } catch (err) {
     console.error('unsubscribePush error:', err);
     errorResponse(res, 'Failed to remove push subscription', 500);
+  }
+}
+
+// POST /api/notifications/broadcast
+export async function broadcastAppNotification(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { title, message, type = 'SYSTEM', metadata } = req.body;
+
+    if (!title || !message) {
+      errorResponse(res, 'Title and message are required', 400);
+      return;
+    }
+
+    const result = await broadcastNotification({
+      title,
+      message,
+      type,
+      metadata,
+    });
+
+    successResponse(
+      res,
+      result,
+      `Broadcast successfully sent to ${result.sentCount} of ${result.totalUsers} users`,
+      200
+    );
+  } catch (err) {
+    console.error('broadcastAppNotification error:', err);
+    errorResponse(res, 'Failed to broadcast notification', 500);
   }
 }

@@ -205,3 +205,33 @@ export async function syncDeadlineAndOverdueNotifications(userId: string) {
     console.error('[Notification] Error syncing deadline notifications:', err);
   }
 }
+
+/**
+ * Broadcasts an in-app notification and web push to all registered users
+ */
+export async function broadcastNotification(params: {
+  title: string;
+  message: string;
+  type?: NotificationType;
+  metadata?: Record<string, any>;
+}): Promise<{ totalUsers: number; sentCount: number }> {
+  const users = await prisma.user.findMany({ select: { id: true } });
+  let sentCount = 0;
+
+  for (const user of users) {
+    try {
+      await createNotification({
+        userId: user.id,
+        type: params.type || 'SYSTEM',
+        title: params.title,
+        message: params.message,
+        metadata: params.metadata,
+      });
+      sentCount++;
+    } catch (err) {
+      console.error(`[Notification] Failed to send broadcast notification to user ${user.id}:`, err);
+    }
+  }
+
+  return { totalUsers: users.length, sentCount };
+}

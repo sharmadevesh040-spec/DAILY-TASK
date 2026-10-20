@@ -7,6 +7,7 @@ import {
   getVapidKey,
   subscribePush,
   unsubscribePush,
+  broadcastAppNotification,
 } from '../controllers/notification.controller';
 import { authenticate } from '../middleware/auth';
 
@@ -21,5 +22,6 @@ router.delete('/:id', deleteNotification);
 router.get('/vapid-public-key', getVapidKey);
 router.post('/subscribe', subscribePush);
 router.post('/unsubscribe', unsubscribePush);
+router.post('/broadcast', broadcastAppNotification);
 
 export default router;

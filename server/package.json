@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "test": "ts-node src/tests/auth_and_storage.test.ts",
+    "notify:update": "ts-node src/scripts/sendAppUpdateNotification.ts",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
