@@ -3,7 +3,7 @@ import multer from 'multer';
 import { prisma } from '../utils/prisma';
 import { successResponse, errorResponse } from '../utils/response';
 import { AuthenticatedRequest } from '../types';
-import { uploadImageBuffer } from '../services/storageService';
+import { uploadImageBuffer, isSupportedImage } from '../services/storageService';
 import { verifyTaskCompletionPhoto } from '../services/aiService';
 import { createNotification } from '../services/notificationService';
 import { addDays, addWeeks, addMonths, isWeekend } from '../utils/dateHelpers';
@@ -16,8 +16,7 @@ export const uploadMiddleware = multer({
     fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
-    if (allowed.includes(file.mimetype.toLowerCase())) {
+    if (isSupportedImage(file.mimetype, file.originalname)) {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Please upload a JPEG, PNG, WEBP, or HEIC photo.'));

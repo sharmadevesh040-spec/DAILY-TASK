@@ -23,6 +23,54 @@ interface Props {
 
 type Step = 'select' | 'camera' | 'preview' | 'submitting' | 'result';
 
+async function compressImageIfNeeded(file: File): Promise<File> {
+  // If file is already small (e.g. <= 1.5MB), return as is
+  if (file.size <= 1.5 * 1024 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      const MAX_DIM = 1920;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(file);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return resolve(file);
+          const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+            type: 'image/jpeg',
+          });
+          resolve(compressed);
+        },
+        'image/jpeg',
+        0.85
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+}
+
 export default function PhotoCompletionModal({ task, onClose, onSuccess }: Props) {
   const { toast } = useToastContext();
 
@@ -112,25 +160,36 @@ export default function PhotoCompletionModal({ task, onClose, onSuccess }: Props
     }
   }
 
-  function handleSelectedFile(file: File) {
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
-    if (!validTypes.includes(file.type.toLowerCase())) {
+  async function handleSelectedFile(file: File) {
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const isImage = file.type.startsWith('image/') || validExtensions.includes(ext);
+
+    if (!isImage) {
       toast('Please upload a valid image (JPEG, PNG, WEBP, or HEIC)', 'error');
       return;
     }
 
-    // Validate size (10MB max)
-    const MAX_SIZE = 10 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      toast('Image exceeds the 10MB size limit. Please choose a smaller photo.', 'error');
-      return;
-    }
+    try {
+      const processedFile = await compressImageIfNeeded(file);
 
-    setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    setStep('preview');
+      // Validate size (10MB max after compression)
+      const MAX_SIZE = 10 * 1024 * 1024;
+      if (processedFile.size > MAX_SIZE) {
+        toast('Image exceeds the 10MB size limit. Please choose a smaller photo.', 'error');
+        return;
+      }
+
+      setSelectedFile(processedFile);
+      const objectUrl = URL.createObjectURL(processedFile);
+      setPreviewUrl(objectUrl);
+      setStep('preview');
+    } catch {
+      setSelectedFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+      setStep('preview');
+    }
   }
 
   function handleRetake() {

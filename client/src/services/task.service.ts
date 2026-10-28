@@ -70,12 +70,12 @@ export const taskService = {
     proof: TaskProof;
   }> {
     const formData = new FormData();
-    formData.append('photo', photoFile);
+    formData.append('photo', photoFile, photoFile.name || 'proof.jpg');
     if (notes) formData.append('notes', notes);
 
     const { data } = await api.post(`/tasks/${taskId}/submit-completion`, formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && onProgress) {

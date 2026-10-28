@@ -40,19 +40,17 @@ async function runTests() {
     'Cloudinary correctly reports unconfigured when credentials are absent'
   );
 
-  // 2. Storage upload rejection in serverless without Cloudinary
+  // 2. Storage upload fallback in serverless without Cloudinary
   try {
     const dummyBuffer = Buffer.from('fake image data');
-    await uploadImageBuffer(dummyBuffer, 'test.jpg', 'image/jpeg');
-    assert(false, 'uploadImageBuffer should reject when storage is unconfigured in serverless');
-  } catch (err: any) {
-    const isDescriptive = err.message.includes('Persistent photo storage is not configured') ||
-      err.message.includes('CLOUDINARY');
+    const result = await uploadImageBuffer(dummyBuffer, 'test.jpg', 'image/jpeg');
+    const isDataUri = result.url.startsWith('data:image/jpeg;base64,');
     assert(
-      isDescriptive,
-      'uploadImageBuffer returns clear descriptive error in serverless',
-      err.message
+      isDataUri,
+      'uploadImageBuffer returns resilient Data URI in serverless when Cloudinary is unconfigured'
     );
+  } catch (err: any) {
+    assert(false, 'uploadImageBuffer should not throw when Cloudinary is unconfigured', err.message);
   }
 
   // Start ephemeral HTTP server on random available port
