@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { prisma } from '../utils/prisma';
 import { cleanupExpiredOtps } from './otpService';
+import { createNotification } from './notificationService';
 
 export function startReminderCron() {
   // Every minute — reminders + overdue task marking
@@ -23,6 +24,15 @@ export function startReminderCron() {
           data: { isSent: true },
         });
         console.log(`[Reminder] Task "${reminder.task.title}" is due at ${reminder.reminderTime}`);
+
+        // Dispatch in-app notification & web push
+        await createNotification({
+          userId: reminder.task.userId,
+          type: 'TASK_DEADLINE',
+          title: '⏰ Task Submission Deadline Approaching!',
+          message: `Task "${reminder.task.title}" deadline is approaching. Complete and submit your task proof before the time limit!`,
+          taskId: reminder.task.id,
+        }).catch((err) => console.error('[Reminder] Push failed:', err));
       }
 
       // Auto-mark overdue tasks

@@ -10,6 +10,9 @@ import {
   Loader2,
   FileImage,
   Info,
+  Clock,
+  Timer,
+  AlertOctagon,
 } from 'lucide-react';
 import { Task, TaskProof } from '../types';
 import { taskService } from '../services/task.service';
@@ -22,6 +25,82 @@ interface Props {
 }
 
 type Step = 'select' | 'camera' | 'preview' | 'submitting' | 'result';
+
+export function getTaskDeadlineInfo(task: Task): {
+  hasDeadline: boolean;
+  deadline: Date | null;
+  isExpired: boolean;
+  remainingText: string;
+  formattedDeadline: string;
+} {
+  if (!task.dueDate) {
+    return {
+      hasDeadline: false,
+      deadline: null,
+      isExpired: false,
+      remainingText: 'No deadline set',
+      formattedDeadline: 'No time limit',
+    };
+  }
+
+  const dateStr = task.dueDate.includes('T') ? task.dueDate.split('T')[0] : task.dueDate;
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  let hours = 23;
+  let minutes = 59;
+  if (task.dueTime) {
+    const parts = task.dueTime.split(':').map(Number);
+    if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+      hours = parts[0];
+      minutes = parts[1];
+    }
+  }
+
+  const deadline = new Date(year, month - 1, day, hours, minutes, 59, 999);
+  const now = new Date();
+  const diffMs = deadline.getTime() - now.getTime();
+  const isExpired = diffMs <= 0;
+
+  const formattedDeadline = deadline.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  if (isExpired) {
+    const elapsedMins = Math.abs(Math.floor(diffMs / (60 * 1000)));
+    let text = `${elapsedMins}m ago`;
+    if (elapsedMins >= 60) {
+      const h = Math.floor(elapsedMins / 60);
+      const m = elapsedMins % 60;
+      text = `${h}h ${m}m ago`;
+    }
+    return {
+      hasDeadline: true,
+      deadline,
+      isExpired: true,
+      remainingText: `Expired ${text}`,
+      formattedDeadline,
+    };
+  }
+
+  const totalMinutes = Math.floor(diffMs / (60 * 1000));
+  let remainingText = `${totalMinutes}m remaining`;
+  if (totalMinutes >= 60) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    remainingText = `${h}h ${m}m remaining`;
+  }
+
+  return {
+    hasDeadline: true,
+    deadline,
+    isExpired: false,
+    remainingText,
+    formattedDeadline,
+  };
+}
 
 async function compressImageIfNeeded(file: File): Promise<File> {
   // If file is already small (e.g. <= 1.5MB), return as is
@@ -201,8 +280,15 @@ export default function PhotoCompletionModal({ task, onClose, onSuccess }: Props
     setStep('select');
   }
 
+  const deadlineInfo = getTaskDeadlineInfo(task);
+
   async function handleSubmit() {
     if (!selectedFile) return;
+
+    if (deadlineInfo.isExpired) {
+      toast('The submission time limit for this task has expired. Submissions must be uploaded before the deadline.', 'error');
+      return;
+    }
 
     setStep('submitting');
     setUploadProgress(0);
@@ -274,6 +360,44 @@ export default function PhotoCompletionModal({ task, onClose, onSuccess }: Props
 
         {/* ── Modal Content ──────────────────────────────────────────────── */}
         <div className="p-5 overflow-y-auto space-y-4">
+          {/* ── Time Limit & Deadline Status Banner ────────────────────────── */}
+          {deadlineInfo.hasDeadline && (
+            <div
+              className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs transition-colors ${
+                deadlineInfo.isExpired
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+              }`}
+            >
+              {deadlineInfo.isExpired ? (
+                <AlertOctagon className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              ) : (
+                <Timer className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-semibold">
+                    {deadlineInfo.isExpired ? 'Time Limit Expired' : 'Task Time Limit'}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                      deadlineInfo.isExpired
+                        ? 'bg-red-200/80 text-red-900'
+                        : 'bg-emerald-200/70 text-emerald-800'
+                    }`}
+                  >
+                    {deadlineInfo.remainingText}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] opacity-90 leading-relaxed">
+                  Deadline: <span className="font-medium">{deadlineInfo.formattedDeadline}</span>.
+                  {deadlineInfo.isExpired
+                    ? ' Submissions are locked because the deadline has passed. Please update the deadline if you need more time.'
+                    : ' Compare with your deadline before submitting. You are within the time limit and ready to upload proof.'}
+                </p>
+              </div>
+            </div>
+          )}
           {/* STEP 1: Select Mode */}
           {step === 'select' && (
             <div className="space-y-4">
@@ -425,10 +549,25 @@ export default function PhotoCompletionModal({ task, onClose, onSuccess }: Props
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  className="btn-primary py-2.5 px-6 gap-2 flex-1"
+                  disabled={deadlineInfo.isExpired}
+                  className={`py-2.5 px-6 gap-2 flex-1 rounded-lg font-medium text-sm transition-colors duration-150 inline-flex items-center justify-center ${
+                    deadlineInfo.isExpired
+                      ? 'bg-red-100 text-red-600 border border-red-200 cursor-not-allowed opacity-80'
+                      : 'btn-primary'
+                  }`}
+                  title={deadlineInfo.isExpired ? 'Cannot submit past time limit' : 'Verify & Complete'}
                 >
-                  <Sparkles className="w-4 h-4 text-primary-200" />
-                  <span>Verify & Complete</span>
+                  {deadlineInfo.isExpired ? (
+                    <>
+                      <AlertOctagon className="w-4 h-4 text-red-600" />
+                      <span>Time Limit Expired</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-primary-200" />
+                      <span>Verify & Complete</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

@@ -126,14 +126,38 @@ export async function submitTaskCompletionPhoto(req: AuthenticatedRequest, res: 
       return;
     }
 
-    // 2. Upload image to object storage (Cloudinary or local static fallback)
+    // 2. Compare with time limit / deadline before allowing submission
+    if (task.dueDate) {
+      const deadline = new Date(task.dueDate);
+      if (task.dueTime) {
+        const [hours, minutes] = task.dueTime.split(':').map(Number);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          deadline.setHours(hours, minutes, 59, 999);
+        } else {
+          deadline.setHours(23, 59, 59, 999);
+        }
+      } else {
+        deadline.setHours(23, 59, 59, 999);
+      }
+
+      if (new Date() > deadline) {
+        errorResponse(
+          res,
+          `The submission time limit for this task has expired (deadline was ${deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Submissions must be uploaded before the deadline.`,
+          400
+        );
+        return;
+      }
+    }
+
+    // 3. Upload image to object storage (Cloudinary or local static fallback)
     const { url: imageUrl, key: imageKey } = await uploadImageBuffer(
       req.file.buffer,
       req.file.originalname,
       req.file.mimetype
     );
 
-    // 3. Perform AI Vision Verification
+    // 4. Perform AI Vision Verification
     const verification = await verifyTaskCompletionPhoto({
       imageBuffer: req.file.buffer,
       mimeType: req.file.mimetype,

@@ -29,16 +29,19 @@ let _transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (_transporter) return _transporter;
 
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const isSecure = port === 465;
+
   _transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,          // STARTTLS on port 587
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port,
+    secure: isSecure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     },
     tls: {
-      rejectUnauthorized: false,  // allow self-signed certs in dev
+      rejectUnauthorized: false,
     },
   });
 

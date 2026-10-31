@@ -20,7 +20,10 @@ router.post(
   '/register',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('email')
+      .isEmail()
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false })
+      .withMessage('Valid email is required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('confirmPassword').custom((value, { req }) => {
       if (value !== req.body.password) throw new Error('Passwords do not match');
@@ -34,7 +37,10 @@ router.post(
 router.post(
   '/login',
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('email')
+      .isEmail()
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false })
+      .withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
   ],
   validate,
@@ -45,7 +51,10 @@ router.post(
 router.post(
   '/send-otp',
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('email')
+      .isEmail()
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false })
+      .withMessage('Valid email is required'),
     body('purpose')
       .isIn(['LOGIN', 'REGISTER', 'PASSWORD_RESET'])
       .withMessage('Invalid purpose'),
@@ -57,7 +66,10 @@ router.post(
 router.post(
   '/verify-otp',
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('email')
+      .isEmail()
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false })
+      .withMessage('Valid email is required'),
     body('otp')
       .isLength({ min: 6, max: 6 })
       .isNumeric()
@@ -73,7 +85,10 @@ router.post(
 router.post(
   '/reset-password',
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('email')
+      .isEmail()
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false })
+      .withMessage('Valid email is required'),
     body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
   ],
   validate,

@@ -148,13 +148,18 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // For REGISTER: allow any valid email (user may not exist yet)
-    // For LOGIN / PASSWORD_RESET: user must already exist
-    if (purpose !== 'REGISTER') {
+    // Check account existence based on purpose
+    if (purpose === 'REGISTER') {
+      const existing = await prisma.user.findUnique({ where: { email: rawEmail } });
+      if (existing) {
+        errorResponse(res, 'An account with this email already exists. Please sign in instead.', 409);
+        return;
+      }
+    } else {
+      // LOGIN or PASSWORD_RESET: user must already exist
       const user = await prisma.user.findUnique({ where: { email: rawEmail } });
       if (!user) {
-        // Return generic message to prevent email enumeration
-        successResponse(res, null, 'If that email is registered, a code has been sent.');
+        errorResponse(res, 'No account found with this email. Please check your email or create an account.', 404);
         return;
       }
     }

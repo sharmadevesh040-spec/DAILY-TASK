@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, Bell, Plus, Sparkles } from 'lucide-react';
+import { Menu, Bell, Plus, Sparkles, LogOut } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TaskModal from './TaskModal';
@@ -22,9 +22,14 @@ interface Props {
 }
 
 export default function Header({ onMenuClick }: Props) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showPlannerModal, setShowPlannerModal] = useState(false);
@@ -121,8 +126,21 @@ export default function Header({ onMenuClick }: Props) {
                          hover:bg-primary-200 active:bg-primary-300
                          transition-colors shrink-0 touch-manipulation"
               aria-label="Open settings"
+              title={`${user?.name || 'User'} (Settings)`}
             >
               {user?.name ? getInitials(user.name) : 'U'}
+            </button>
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center w-9 h-9 rounded-lg
+                         text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100
+                         transition-colors shrink-0 touch-manipulation"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

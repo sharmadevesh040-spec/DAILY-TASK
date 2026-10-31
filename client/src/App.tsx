@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { PwaProvider } from './context/PwaContext';
+import { AlarmProvider } from './context/AlarmContext';
 import InstallPromptModal from './components/InstallPromptModal';
 import AppLayout from './layouts/AppLayout';
 import LoginPage from './pages/LoginPage';
@@ -108,8 +109,10 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <PwaProvider>
-            <AppRoutes />
-            <InstallPromptModal />
+            <AlarmProvider>
+              <AppRoutes />
+              <InstallPromptModal />
+            </AlarmProvider>
           </PwaProvider>
         </ToastProvider>
       </AuthProvider>

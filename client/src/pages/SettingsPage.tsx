@@ -1,16 +1,25 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { User, Lock, Loader2, Check, Smartphone, Download, CheckCircle2, Sparkles, Bell, BellRing } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, Lock, Loader2, Check, Smartphone, Download, CheckCircle2, Sparkles, Bell, BellRing, Volume2, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
 import { notificationService } from '../services/notification.service';
 import { useToastContext } from '../context/ToastContext';
 import { usePwa } from '../context/PwaContext';
+import { useAlarm } from '../context/AlarmContext';
 import { getInitials } from '../utils';
 
 export default function SettingsPage() {
-  const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
+  const { user, updateUser, logout } = useAuth();
   const { isInstalled, isInstallable, openInstallPrompt } = usePwa();
   const { toast }            = useToastContext();
+  const { testAlarm }        = useAlarm();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   const [name,           setName]           = useState(user?.name || '');
   const [profileLoading, setProfileLoading] = useState(false);
@@ -266,6 +275,33 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+
+          {/* Alarm Audio & Haptics Testing */}
+          <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <Volume2 className="w-4 h-4 text-primary-600 shrink-0" />
+              <p className="text-sm font-semibold text-gray-900">Task Start & Deadline Alarms</p>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              When a task starts or when the submission deadline approaches, an audible alarm chime and phone vibration trigger automatically.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => testAlarm('start')}
+                className="btn-secondary py-1.5 px-3 text-xs gap-1.5"
+              >
+                <span>🔔 Test Task Start Alarm</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => testAlarm('deadline')}
+                className="btn-secondary py-1.5 px-3 text-xs gap-1.5 text-amber-700 hover:text-amber-800"
+              >
+                <span>🚨 Test Deadline Alarm</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -311,6 +347,26 @@ export default function SettingsPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* ── Sign Out card ─────────────────────────────────────────────────── */}
+      <div className="card p-4 sm:p-6 border-red-100 bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Account Session</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Signed in as <span className="font-medium text-gray-800">{user?.email}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="btn-danger w-full sm:w-auto text-xs py-2.5 px-4 gap-1.5 shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Log Out</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -15,10 +15,12 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Play,
 } from 'lucide-react';
 import { Task, TaskProof } from '../types';
 import { taskService } from '../services/task.service';
 import { useToastContext } from '../context/ToastContext';
+import { useAlarm } from '../context/AlarmContext';
 import {
   getPriorityColor,
   getPriorityDot,
@@ -40,7 +42,9 @@ interface Props {
 
 export default function TaskCard({ task, onUpdate, onDelete }: Props) {
   const { toast } = useToastContext();
+  const { triggerTaskStartAlarm } = useAlarm();
   const [toggling, setToggling] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -50,6 +54,21 @@ export default function TaskCard({ task, onUpdate, onDelete }: Props) {
 
   const isCompleted = task.status === 'COMPLETED';
   const overdueFlag = isOverdue(task.dueDate, task.status);
+
+  // Start task & sound alarm
+  async function handleStartTask() {
+    setStarting(true);
+    try {
+      const updated = await taskService.updateStatus(task.id, 'IN_PROGRESS');
+      onUpdate(updated);
+      triggerTaskStartAlarm(updated);
+      toast(`Started "${task.title}"! Alarm sounded.`, 'success');
+    } catch {
+      toast('Failed to start task', 'error');
+    } finally {
+      setStarting(false);
+    }
+  }
 
   // Checkbox toggle logic
   async function handleCheckboxClick() {
@@ -169,7 +188,20 @@ export default function TaskCard({ task, onUpdate, onDelete }: Props) {
               </button>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-0.5 shrink-0 sm:opacity-80 sm:group-hover:opacity-100 sm:transition-opacity">
+              <div className="flex items-center gap-1 shrink-0 sm:opacity-90 sm:group-hover:opacity-100 sm:transition-opacity">
+                {/* Start Task button (if TODO) */}
+                {!isCompleted && task.status === 'TODO' && (
+                  <button
+                    onClick={handleStartTask}
+                    disabled={starting}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 transition-colors touch-manipulation border border-emerald-200/60"
+                    title="Start task (sounds alarm on your phone)"
+                  >
+                    <Play className="w-3 h-3 fill-emerald-600 text-emerald-600" />
+                    <span>Start</span>
+                  </button>
+                )}
+
                 {/* Complete with Photo button (if incomplete) */}
                 {!isCompleted && (
                   <button
