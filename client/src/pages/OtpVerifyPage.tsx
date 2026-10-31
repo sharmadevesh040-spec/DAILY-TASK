@@ -4,6 +4,7 @@ import { Loader2, Zap, Mail, ArrowLeft, RefreshCw, ShieldCheck, Lock, Eye, EyeOf
 import { useAuth } from '../context/AuthContext';
 import { authService, OtpPurpose, AuthResponse, OtpVerifiedResponse } from '../services/auth.service';
 import { useToastContext } from '../context/ToastContext';
+import { extractErrorMessage } from '../utils';
 import OtpInput from '../components/OtpInput';
 
 // ── State passed via router navigation ───────────────────────────────────────
@@ -138,10 +139,7 @@ export default function OtpVerifyPage() {
         setTimeout(() => navigate('/dashboard', { replace: true }), 800);
       }
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err instanceof Error ? err.message : 'Verification failed. Please try again.');
-      setError(msg);
+      setError(extractErrorMessage(err, 'Verification failed. Please try again.'));
     } finally {
       setVerifying(false);
     }
@@ -171,10 +169,7 @@ export default function OtpVerifyPage() {
       toast('Password reset successfully! 🎉', 'success');
       setTimeout(() => navigate('/dashboard', { replace: true }), 800);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to reset password. Please try again.';
-      setResetError(msg);
+      setResetError(extractErrorMessage(err, 'Failed to reset password. Please try again.'));
     } finally {
       setResetLoading(false);
     }
@@ -192,10 +187,7 @@ export default function OtpVerifyPage() {
       setResendWait(RESEND_COOLDOWN_S);
       toast('New code sent — check your inbox', 'info');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Failed to resend code. Please try again.';
-      setError(msg);
+      setError(extractErrorMessage(err, 'Failed to resend code. Please try again.'));
     } finally {
       setSending(false);
     }

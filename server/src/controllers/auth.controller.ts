@@ -150,14 +150,18 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
 
     // Check account existence based on purpose
     if (purpose === 'REGISTER') {
-      const existing = await prisma.user.findUnique({ where: { email: rawEmail } });
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: rawEmail, mode: 'insensitive' } },
+      });
       if (existing) {
         errorResponse(res, 'An account with this email already exists. Please sign in instead.', 409);
         return;
       }
     } else {
       // LOGIN or PASSWORD_RESET: user must already exist
-      const user = await prisma.user.findUnique({ where: { email: rawEmail } });
+      const user = await prisma.user.findFirst({
+        where: { email: { equals: rawEmail, mode: 'insensitive' } },
+      });
       if (!user) {
         errorResponse(res, 'No account found with this email. Please check your email or create an account.', 404);
         return;
@@ -181,11 +185,14 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
     successResponse(res, null, 'Verification code sent. Check your inbox.');
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to send verification code';
-    // Mask SMTP credential errors from the client
-    const safeMsg = msg.includes('SMTP') || msg.includes('credentials')
-      ? 'Unable to send verification email. Please try again later.'
-      : msg;
-    console.error('[sendOtp]', msg);
+    console.error('[sendOtp] Failure:', msg);
+    // Mask raw credential secrets but give informative feedback
+    const safeMsg =
+      msg.includes('SMTP_USER') || msg.includes('SMTP_PASSWORD') || msg.includes('credentials are not configured')
+        ? 'Email service is temporarily unavailable. Please try again later.'
+        : msg.includes('Invalid login') || msg.includes('535')
+        ? 'Email server authentication issue. Please try again later.'
+        : msg;
     errorResponse(res, safeMsg, 500);
   }
 }
@@ -227,9 +234,11 @@ export async function verifyOtpAndAuth(req: Request, res: Response): Promise<voi
     }
 
     // ── LOGIN: find existing user and issue JWT ─────────────────────────────
-    const user = await prisma.user.findUnique({ where: { email: rawEmail } });
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: rawEmail, mode: 'insensitive' } },
+    });
     if (!user) {
-      errorResponse(res, 'No account found for this email.', 404);
+      errorResponse(res, 'No account found with this email. Please check your email or create an account.', 404);
       return;
     }
 
@@ -260,9 +269,11 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email: rawEmail } });
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: rawEmail, mode: 'insensitive' } },
+    });
     if (!user) {
-      errorResponse(res, 'No account found for this email.', 404);
+      errorResponse(res, 'No account found with this email. Please check your email or create an account.', 404);
       return;
     }
 

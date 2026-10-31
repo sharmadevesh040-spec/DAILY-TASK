@@ -61,7 +61,7 @@ export default defineConfig({
         runtimeCaching: [
           {
             // API endpoints should never be served from stale service worker cache
-            urlPattern: ({ url }) => url.pathname.includes('/api') || url.hostname.includes('vercel.app'),
+            urlPattern: ({ url }) => url.pathname.includes('/api') || url.hostname === 'daily-task-api-mu.vercel.app',
             handler: 'NetworkOnly',
           },
         ],

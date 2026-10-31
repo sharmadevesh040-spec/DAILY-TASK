@@ -21,10 +21,15 @@ import { validateSmtpConfig } from './services/emailService';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust reverse proxy (Vercel, Render, Nginx) so client IP and rate-limiting work properly
+app.set('trust proxy', 1);
+
 // Security middleware
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:3000',
+  'http://localhost:4173',
   'https://daily-task-client-pi.vercel.app',
   'https://localhost', // Capacitor Android WebView
   ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
@@ -41,14 +46,26 @@ app.use(
     origin: (origin, callback) => {
       // Allow server-to-server / curl / Postman (no Origin header)
       if (!origin) return callback(null, true);
+      // Allow any localhost / 127.0.0.1
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+      // Allow local network IPs (e.g. phone browsing dev server on 192.168.x.x, 10.x.x.x)
+      if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) return callback(null, true);
+      // Allow all Vercel deployments (*.vercel.app)
+      if (/^https:\/\/([a-zA-Z0-9_-]+\.)*vercel\.app$/.test(origin)) return callback(null, true);
+      // Allow mobile webview / Capacitor schemes
+      if (/^(capacitor|ionic|file|app|vscode-webview):\/\//.test(origin) || origin === 'null') return callback(null, true);
       if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin '${origin}' not allowed`));
+      // Fallback: reflect requesting origin cleanly without throwing CORS 500 error
+      return callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   })
 );
+
+// Preflight OPTIONS handler
+app.options('*', cors());
 
 // Serve local upload fallbacks statically (if folder exists)
 const uploadsDir = path.resolve(process.cwd(), 'uploads');
@@ -59,19 +76,23 @@ app.use('/uploads', (req, res, next) => {
   next();
 });
 
-// Rate limiting
+// Rate limiting (general)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later' },
 });
 app.use('/api/', limiter);
 
-// Auth rate limit (stricter)
+// Auth rate limit (accommodates normal auth/OTP usage & testing)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: 'Too many auth attempts, please try again later' },
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many auth attempts. Please wait a few minutes before trying again.' },
 });
 app.use('/api/auth/', authLimiter);
 

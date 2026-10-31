@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, Zap, Mail, Lock, KeyRound, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/auth.service';
+import { extractErrorMessage } from '../utils';
 
 type LoginTab = 'password' | 'otp';
 
@@ -39,10 +40,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
-      setPwError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Login failed. Please try again.'
-      );
+      setPwError(extractErrorMessage(err, 'Login failed. Please check your credentials and try again.'));
     } finally {
       setPwLoading(false);
     }
@@ -62,10 +60,7 @@ export default function LoginPage() {
       await authService.sendOtp({ email: trimmed, purpose: 'LOGIN' });
       navigate('/verify-otp', { state: { email: trimmed, purpose: 'LOGIN' } });
     } catch (err: unknown) {
-      setOtpError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Unable to send verification code. Please try again.'
-      );
+      setOtpError(extractErrorMessage(err, 'Unable to send verification code. Please try again.'));
     } finally {
       setOtpLoading(false);
     }
@@ -85,10 +80,7 @@ export default function LoginPage() {
       await authService.sendOtp({ email: trimmed, purpose: 'PASSWORD_RESET' });
       navigate('/verify-otp', { state: { email: trimmed, purpose: 'PASSWORD_RESET' } });
     } catch (err: unknown) {
-      setForgotError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Unable to send reset code. Please try again.'
-      );
+      setForgotError(extractErrorMessage(err, 'Unable to send reset code. Please try again.'));
     } finally {
       setForgotLoading(false);
     }
@@ -164,8 +156,16 @@ export default function LoginPage() {
               </p>
 
               {forgotError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words animate-fade-in">
-                  {forgotError}
+                <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 break-words animate-fade-in flex flex-col gap-1.5">
+                  <p>{forgotError}</p>
+                  {forgotError.toLowerCase().includes('no account') && (
+                    <Link
+                      to="/register"
+                      className="text-xs font-semibold text-primary-700 hover:text-primary-800 underline inline-block"
+                    >
+                      Need an account? Sign up here &rarr;
+                    </Link>
+                  )}
                 </div>
               )}
 

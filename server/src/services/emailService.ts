@@ -43,6 +43,9 @@ function getTransporter(): Transporter {
     tls: {
       rejectUnauthorized: false,
     },
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
 
   return _transporter;

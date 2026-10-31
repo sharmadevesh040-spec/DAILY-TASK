@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, Zap, Check, Mail } from 'lucide-react';
 import { authService } from '../services/auth.service';
+import { extractErrorMessage } from '../utils';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -63,9 +64,7 @@ export default function RegisterPage() {
       });
     } catch (err: unknown) {
       setErrors({
-        submit:
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Unable to send verification code. Please try again.',
+        submit: extractErrorMessage(err, 'Unable to send verification code. Please try again.'),
       });
     } finally {
       setLoading(false);

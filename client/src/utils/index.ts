@@ -109,3 +109,102 @@ export function toLocalDateString(date: Date): string {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * Extracts a clean, human-readable error message from an unknown error (AxiosError, Error, string, or object).
+ */
+export function extractErrorMessage(err: unknown, fallback = 'An unexpected error occurred. Please try again.'): string {
+  if (!err) return fallback;
+
+  if (typeof err === 'string' && err.trim()) return err.trim();
+
+  if (typeof err === 'object') {
+    const anyErr = err as {
+      response?: {
+        status?: number;
+        data?: unknown;
+      };
+      message?: string;
+      code?: string;
+    };
+
+    // Check Axios response
+    if (anyErr.response?.data) {
+      const data = anyErr.response.data as Record<string, unknown> | string;
+
+      // Plain string response
+      if (typeof data === 'string') {
+        const trimmed = data.trim();
+        if (trimmed.startsWith('<')) {
+          if (anyErr.response.status === 504 || trimmed.includes('504')) {
+            return 'Server connection timed out. Please try again.';
+          }
+          if (anyErr.response.status === 502 || trimmed.includes('502')) {
+            return 'Server is temporarily unavailable. Please try again.';
+          }
+          if (anyErr.response.status === 404) {
+            return 'Resource not found. Please try again.';
+          }
+          return `Server returned status ${anyErr.response.status}. Please try again.`;
+        }
+        return trimmed;
+      }
+
+      // JSON { message: "..." }
+      if (typeof data.message === 'string' && data.message.trim()) {
+        return data.message.trim();
+      }
+
+      // JSON { error: "..." }
+      if (typeof data.error === 'string' && data.error.trim()) {
+        return data.error.trim();
+      }
+
+      // express-validator errors array [{ msg: "..." }]
+      if (Array.isArray(data.errors) && data.errors.length > 0) {
+        const msgs = data.errors
+          .map((e: unknown) => {
+            if (typeof e === 'string') return e;
+            if (e && typeof e === 'object') {
+              const obj = e as { msg?: string; message?: string };
+              return obj.msg || obj.message || '';
+            }
+            return '';
+          })
+          .filter(Boolean);
+        if (msgs.length > 0) return msgs.join(', ');
+      }
+    }
+
+    // Status code fallbacks when no specific body message was sent
+    if (anyErr.response?.status === 404) {
+      return 'No account found with this email. Please check your email or create an account.';
+    }
+    if (anyErr.response?.status === 409) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    if (anyErr.response?.status === 429) {
+      return 'Too many requests. Please wait a moment before trying again.';
+    }
+    if (anyErr.response?.status === 401) {
+      return 'Invalid credentials. Please try again.';
+    }
+    if (anyErr.response?.status && anyErr.response.status >= 500) {
+      return 'Email server issue. Please verify your connection or try again later.';
+    }
+
+    // Network / timeout / offline errors
+    if (anyErr.message === 'Network Error' || anyErr.code === 'ERR_NETWORK') {
+      return 'Network connection error. Please check your internet connection and try again.';
+    }
+    if (anyErr.code === 'ECONNABORTED' || anyErr.message?.toLowerCase().includes('timeout')) {
+      return 'Request timed out. Please check your connection and try again.';
+    }
+
+    if (anyErr.message && typeof anyErr.message === 'string' && anyErr.message !== 'Error') {
+      return anyErr.message;
+    }
+  }
+
+  return fallback;
+}
